@@ -1,0 +1,3 @@
+## Mini-project: Sweet Crumb order assistant
+
+Quackie is a mock assistant for Sweet Crumb Bakery that uses a BakeryOrderLookup tool to report the status of pre orders like CB101. It is a mock because every reply comes from if statements that look for keywords, with no AI model, and the orders are made-up dictionary. Messages containing the words "allergy, "refund", or "cancel" are passed to a human baker, because allergies are a health risk and refunds or cancellations change the order itself. If this used real customer data, anyone who types a guessed order ID would see that order's status with no check of who they are. 
