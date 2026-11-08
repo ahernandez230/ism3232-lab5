@@ -5,13 +5,14 @@ HANDOFF_WORDS = ["allergy", "refund", "cancel"]
 
 
 class BakeryAssistant:
-    """A mock bakery assistant. Its replies come from simple rules, not from AI."""
+    """A bakery assistant. Rules handle what must be right. A model handles the rest."""
 
-    def __init__(self, name, instructions, order_tool):
-        """Set up one assistant with its own name, instructions, tool, and history."""
+    def __init__(self, name, instructions, order_tool, model):
+        """Set up one assistant with its own name, instructions, tool, model, and history."""
         self.name = name
         self.instructions = instructions
         self.order_tool = order_tool
+        self.model = model  # CHANGE 1: store the model we were handed
         self.history = []
 
     def respond(self, user_message):
@@ -22,17 +23,26 @@ class BakeryAssistant:
         return reply
 
     def choose_reply(self, user_message):
-        """Choose a reply with keyword rules. This is the mock part."""
+        """Use a rule when one applies. Otherwise ask the model."""
         text = user_message.lower()
         if self.needs_human(text):
-            return "I can't help with that here. I'm passing you to a baker, since allergies, refunds, and cancellations require human attention."
+            return (
+                "I can't help with that here. I'm passing you to a baker, "
+                "since allergies, refunds, and cancellations require human attention."
+            )
         if "order" in text:
             return self.order_reply(user_message)
-        if "hello" in text:
-            return f"Hello! I'm {self.name}. I can check on your cupcake order for you."
         return (
-            "I'm not sure how to help with that. I can check a cupcake order for you."
-        )
+            self.model_reply()
+        )  # CHANGE 2: the hello rule and "not sure" reply are gone
+
+    def model_reply(self):
+        """Ask the model for a reply. Give a safe answer if the model has none."""
+        # CHANGE 3: the model gets the instructions and the whole history.
+        reply = self.model.reply(self.instructions, self.history)
+        if reply is None:
+            return "Sorry, I can't answer that right now. Please try again in a moment."
+        return reply
 
     def needs_human(self, text):
         """Return True if the message is about something a person must handle."""
