@@ -2,17 +2,18 @@
 # Author: Ariadna Hernandez
 
 HANDOFF_WORDS = ["allergy", "refund", "cancel"]
+MAX_TOOL_ROUNDS = 3
 
 
 class BakeryAssistant:
     """A bakery assistant. Rules handle what must be right. A model handles the rest."""
 
-    def __init__(self, name, instructions, order_tool, model):
-        """Set up one assistant with its own name, instructions, tool, model, and history."""
+    def __init__(self, name, instructions, tools, model):
+        """Set up one assistant with its own name, instructions, tools, model, and history."""
         self.name = name
         self.instructions = instructions
-        self.order_tool = order_tool
-        self.model = model  # CHANGE 1: store the model we were handed
+        self.tools = tools
+        self.model = model
         self.history = []
 
     def respond(self, user_message):
@@ -23,26 +24,14 @@ class BakeryAssistant:
         return reply
 
     def choose_reply(self, user_message):
-        """Use a rule when one applies. Otherwise ask the model."""
+        """Pass handoff topics to a person. Send everything else to the model."""
         text = user_message.lower()
         if self.needs_human(text):
             return (
                 "I can't help with that here. I'm passing you to a baker, "
                 "since allergies, refunds, and cancellations require human attention."
             )
-        if "order" in text:
-            return self.order_reply(user_message)
-        return (
-            self.model_reply()
-        )  # CHANGE 2: the hello rule and "not sure" reply are gone
-
-    def model_reply(self):
-        """Ask the model for a reply. Give a safe answer if the model has none."""
-        # CHANGE 3: the model gets the instructions and the whole history.
-        reply = self.model.reply(self.instructions, self.history)
-        if reply is None:
-            return "Sorry, I can't answer that right now. Please try again in a moment."
-        return reply
+        return self.model_reply()
 
     def needs_human(self, text):
         """Return True if the message is about something a person must handle."""
@@ -51,10 +40,26 @@ class BakeryAssistant:
                 return True
         return False
 
-    def order_reply(self, user_message):
-        """Use the order tool to answer a question about an order."""
-        order_id = self.order_tool.find_order_id(user_message)
-        if order_id is None:
-            return "Which order? Please send an order ID like CB101."
-        status = self.order_tool.find_status(order_id)
-        return f"Order {order_id} is {status}."
+    def model_reply(self):
+        """Ask the model. Run each tool it asks for, then ask again, up to a limit."""
+        rounds = 0
+        while rounds < MAX_TOOL_ROUNDS:
+            tool_list = self.tools.tool_list()
+            decision = self.model.decide(self.instructions, self.history, tool_list)
+            if decision is None:
+                return "Sorry, I can't answer that right now. Please try again in a moment."
+            if "text" in decision:
+                return decision["text"]
+            name = decision["tool"]
+            arguments = decision["arguments"]
+            result = self.tools.run(name, arguments, self.history)
+            self.history.append(
+                {
+                    "role": "tool",
+                    "tool_name": name,
+                    "arguments": arguments,
+                    "content": result,
+                }
+            )
+            rounds += 1
+        return "Sorry, I couldn't finish that. I'm passing you to a baker."
